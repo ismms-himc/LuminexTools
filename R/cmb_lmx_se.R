@@ -9,7 +9,8 @@ cmb_lmx_se <- function(se_list){
 
   rowdata_list <- lapply(se_list, function(x){
     temp <- data.frame(x@elementMetadata@listData)
-    colnames(temp) <- paste(colnames(temp), x$Plate.ID[1], sep = "_")
+    Plate.ID <- gsub("(^.*/|\\.Detail.xls)",  "",x$f_name[1])
+    colnames(temp) <- paste(colnames(temp), Plate.ID, sep = "_")
     temp
   })
 
@@ -20,6 +21,8 @@ cmb_lmx_se <- function(se_list){
   }
 
   colnames(row_data) <- make.names(colnames(row_data), unique = T)
+  row_data$LOD <- rowMeans(row_data[ , grepl("LOD_.*$", colnames(row_data))], na.rm = T)
+  row_data$HOD <- rowMeans(row_data[ , grepl("HOD_.*$", colnames(row_data))], na.rm = T)
 
   # remove LOD from combined se object does not make senes to keep it
   se_list <- lapply(se_list, function(x){

@@ -60,7 +60,7 @@ read_lmx <- function(f, lot = "default", analyt_start_row){
   })
 
   # get missing lod pct
-  rowdata$LOD_pct <- sapply(data.frame(is.infinite(fdata_na)), function(x){
+  rowdata$oor_pct <- sapply(data.frame(is.infinite(fdata_na)), function(x){
     round(sum(x) / length(x) * 100, 2)
   })
 
@@ -146,7 +146,7 @@ read_lmx <- function(f, lot = "default", analyt_start_row){
   re <- SummarizedExperiment(colData = coldata,
                              rowData = rowdata,
                              assays = list(data_default = t(fdata_na),
-                                           #data_imputed = t(fdata),
+                                           data_imputed = t(fdata),
                                            mfi_default = t(rdata),
                                            cv = t(cvs)),
                              metadata = list("file_name" = toString(f)))
