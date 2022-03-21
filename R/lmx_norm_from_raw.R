@@ -8,7 +8,7 @@
 #'@md
 
 lmx_norm_from_raw <- function(f_list, plex, pre_fix, map_csv, morm_method = "median", ref_sample = "QC"){
-  if(is_null(names(f_list))){
+  if(rlang::is_null(names(f_list))){
     names(f_list) <- f_list
   }
 

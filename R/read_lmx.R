@@ -1,4 +1,4 @@
-#'read_lmx (read onlink npx file to summarizedexperiment)
+
 #'@description  read lmx raw file to create a summarizedexperiment
 #'              >HOD is replaced by Inf, <LOD is replaced by -Inf;
 #'              retrieve STD3, and the lowest, the hightest STD's MFI, Conc.

@@ -1,0 +1,199 @@
+---
+title: "vignette"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Read files
+read in files as a named list, check "analyte start row" in the analyte tab from the file. The "analyte start row" is the header row where the sample section begains below the standard curve section.    
+
+
+```{r, results='hide'}
+library(LuminexTools)
+
+f.list <- list.files("~/Downloads/RE__MAGU02__3_Kidney_injury_panel_results_for_73_urine_samples", pattern = "Panel3", recursive = F, full.names = T)
+names(f.list) <- gsub("-", "_", f.list)
+
+f.list <- lapply(f.list, read_lmx, analyt_start_row = 26)
+
+```
+
+### ref-sample normalization 
+define reference samples and do ref-sample normalization     
+
+
+```{r}
+ref_sample <- c("MAGU02_7007_V3", "MAGU02_7001_V3", "MAGU02_7005_V2", "MAGU02_7006_V1", "HD Urine Pool 319", "QC1", "QC2")
+f.list <- bdg_norm_lmx_multi(bridge.str = ref_sample, data.ls = f.list)
+```
+
+### combine to one dataset    
+optional to save and export the combined datasets to csv.  
+exported files include:     
+default: raw concentration, out of range data point used Inf or -Inf.    
+imputated: concentration data, out of range data point used LLOD or HLOD.    
+normed: if normalization performed, based on default data.    
+mfi: mfi dataset.    
+cv: cv between replicates.    
+normed_mfi: if normalization performed, based on mfi data.    
+    
+    
+```{r}
+cmb <- cmb_lmx_se(f.list)
+
+unique(cmb$File)
+cmb$File <- gsub("(.*/|_Results_.Detail.xls|_Results.Detail.xls)", "", cmb$File)
+
+names(cmb@assays)
+
+save_lmx_csv(cmb, pre_fix = "~/Downloads/", assay2save = names(cmb@assays))
+```
+
+### plotting 
+
+```{r}
+
+lod <- data.frame(analyt = rownames(cmb),
+                  lapply(names(cmb@elementMetadata)[grep("LOD_", names(cmb@elementMetadata))], function(x){
+                    cmb@elementMetadata[[x]]
+                  })%>%
+                    do.call(what = "cbind")%>%
+                    set_colnames(value = unique(cmb$File))
+                  )%>%
+  gather(-analyt, key = "File", value = "lod")
+
+hod <- data.frame(analyt = rownames(cmb),
+                  lapply(names(cmb@elementMetadata)[grep("HOD_", names(cmb@elementMetadata))], function(x){
+                    cmb@elementMetadata[[x]]
+                  })%>%
+                    do.call(what = "cbind")%>%
+                    set_colnames(value = unique(cmb$File))
+                  )%>%
+  gather(-analyt, key = "File", value = "hod")
+
+idf <- paste(ref_sample, collapse = "|")
+idf <- paste0("(", idf, ")")
+
+```
+
+### sample distribution     
+
+```{r}
+plotdf <- data.frame(Sample = cmb$Sample,
+                     File = cmb$File,
+                     t(cmb@assays@data$data_imputed))%>%
+  mutate(Type = ifelse(grepl(idf, Sample, ignore.case = T), "QC", "StudySample"))%>%
+  gather(-Sample, -Type, -File, key = "analyte", value = "value")
+
+plot.ls <- lapply(unique(plotdf$analyte), function(x){
+
+  tit = x
+  plotdf%>%
+  filter(analyte == x)%>%
+  ggplot(aes(Type, log10(value)))+
+  geom_jitter()+
+  ggrepel::geom_text_repel(aes(label = Sample), size = 3)+
+  geom_segment(aes(x = 0.5, xend = 2.5, y = log10(lod), yend = log10(lod)),
+               color = "blue",
+               data = lod %>% filter(analyt == x))+
+  geom_segment(aes(x = 0.5, xend = 2.5, y = log10(hod), yend = log10(hod)),
+             color = "red",
+             data = hod %>% filter(analyt == x))+
+  labs(title = tit, y = "log Conc.", x = "")+
+  facet_wrap(~File)+
+  theme_bw(base_size = 12)+
+  theme(axis.text.x = element_text(angle = 90, hjust = 0.5, vjust = 0.5, size = 8))
+})
+
+wrap_plots(plot.ls, ncol = 1)
+
+```
+
+### out of range count
+
+```{r}
+plot.ls <- lapply(names(f.list), function(x){
+  sub_tit = paste(gsub("(.*/|_Results_.Detail.xls|_Results.Detail.xls)", "", x),
+                  "\ntotal sample on plates:", ncol(f.list[[x]]))
+
+  data.frame(Sample = f.list[[x]]$Sample,
+                     t(f.list[[x]]@assays@data$data_default))%>%
+  gather(-Sample, key = "analyte", value = "value")%>%
+  group_by(analyte)%>%
+  summarise(out_of_range_count = sum(!is.finite(value)))%>%
+  ggplot(aes(analyte, out_of_range_count))+
+  geom_bar(stat = "identity", alpha = 0.7)+
+  geom_text(aes(label = out_of_range_count))+
+  coord_flip()+
+  labs(subtitle = sub_tit)+
+  theme_bw()
+})
+
+
+```
+
+### ref sample pre and post norm
+
+```{r}
+#before and after norm
+plotdf <- data.frame(Sample = cmb$Sample,
+                     File = cmb$File,
+                     t(cmb@assays@data$data_default))%>%
+  mutate(Sample = gsub("(P2_|_2$|_1$)", "", Sample))%>%
+  filter(Sample %in% ref_sample)%>%
+  gather(-Sample, -File, key = "analyte", value = "pre_norm")%>%
+  left_join(
+    data.frame(Sample = cmb$Sample,
+                     File = cmb$File,
+                     t(cmb@assays@data$data_normed))%>%
+      mutate(Sample = gsub("(P2_|_2$|_1$)", "", Sample))%>%
+      filter(Sample %in% ref_sample)%>%
+      gather(-Sample, -File, key = "analyte", value = "post_norm")
+  )%>%
+  gather(-Sample, -File, -analyte, key = "type", value = "value")
+
+plot.ls <- lapply(unique(plotdf$analyte), function(x){
+
+  tit = x
+  plotdf%>%
+  filter(analyte == x)%>%
+  ggplot(aes(type, log10(value)))+
+  geom_point()+
+  geom_line(aes(group = interaction(Sample, File)))+
+  ggrepel::geom_text_repel(aes(label = Sample), size = 3)+
+  labs(title = tit, y = "log Conc.", x = "")+
+  #facet_wrap(~File)+
+  theme_bw(base_size = 12)
+})
+
+# not log scale
+plot.ls <- lapply(unique(plotdf$analyte), function(x){
+
+  tit = x
+  plotdf%>%
+  filter(analyte == x)%>%
+  ggplot(aes(type, value))+
+  geom_point()+
+  geom_line(aes(group = interaction(Sample, File)))+
+  ggrepel::geom_text_repel(aes(label = Sample), size = 3)+
+  labs(title = tit, y = "Conc.", x = "")+
+  #facet_wrap(~File)+
+  theme_bw(base_size = 12)
+})
+
+wrap_plots(plot.ls, ncol = 1)
+
+plotdf%>%
+  group_by(Sample, analyte, type)%>%
+  summarize(cv = round(sd(value, na.rm = T)/mean(value, na.rm = T) * 100, 2) )%>%
+  DT::datatable()
+
+
+plot.ls <- lapply(unique(plotdf$analyte), function(x){
+  
+})
+```
+

@@ -9,7 +9,7 @@ cmb_lmx_se <- function(se_list){
 
   rowdata_list <- lapply(se_list, function(x){
     temp <- data.frame(x@elementMetadata@listData)
-    Plate.ID <- gsub("(^.*/|\\.Detail.xls)",  "",x$f_name[1])
+    Plate.ID <- gsub("(^.*/|\\.Detail.xls)",  "",x$File[1])
     colnames(temp) <- paste(colnames(temp), Plate.ID, sep = "_")
     temp
   })
