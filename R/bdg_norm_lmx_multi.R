@@ -38,7 +38,7 @@ bdg_norm_lmx_multi <- function(bridge.str, data.ls, between.plate.method = "medi
       cmb_lmx_se()
     #  count
     bridge.plate.mean <- cbind.data.frame(File = bridge$File,
-                                          t(bridge@assays@data[[assay_from]] %>% log10))%>%
+                                          t(bridge@assays@data[[from_assay]] %>% log10))%>%
       group_by(File)%>%
       summarize_all(.fun = mean, na.rm = T)
 
@@ -64,7 +64,8 @@ bdg_norm_lmx_multi <- function(bridge.str, data.ls, between.plate.method = "medi
   if(length(adj.ls) > 1){
     for (i in names(adj.mean)) {
       for (j in 2 : length(adj.ls)) {
-        adj.mean[[i]] <- adj.mean[[i]] + adj.ls[[j]][[i]]
+        #adj.mean[[i]] <- adj.mean[[i]] + adj.ls[[j]][[i]]
+        adj.mean[[i]] <- mapply(function(x, y) sum(x, y, na.rm = T), x = adj.mean[[i]], y = adj.ls[[j]][[i]])
       }
       adj.mean[[i]] <- adj.mean[[i]]/length(adj.ls)
     }
@@ -102,7 +103,8 @@ bdg_norm_lmx_multi <- function(bridge.str, data.ls, between.plate.method = "medi
   if(length(adj.ls.mfi) > 1){
     for (i in names(adj.mean.mfi)) {
       for (j in 2 : length(adj.ls.mfi)) {
-        adj.mean.mfi[[i]] <- adj.mean.mfi[[i]] + adj.ls.mfi[[j]][[i]]
+        #adj.mean.mfi[[i]] <- adj.mean.mfi[[i]] + adj.ls.mfi[[j]][[i]]
+        adj.mean.mfi[[i]] <- mapply(function(x, y) sum(x, y, na.rm = T), x = adj.mean.mfi[[i]], y = adj.ls.mfi[[j]][[i]])
       }
       adj.mean.mfi[[i]] <- adj.mean.mfi[[i]]/length(adj.ls.mfi)
     }
@@ -114,7 +116,7 @@ bdg_norm_lmx_multi <- function(bridge.str, data.ls, between.plate.method = "medi
   #save.assay.mfi <- paste("mfi", save_assay, sep = "_")
   data.ls <- lapply(query, function(x){
     temp <- data.ls[[x]]
-    temp@assays@data[[save_assay]] <- 10^(log10(temp@assays@data[[assay_from]]) - unlist(adj.mean[[x]]))%>%round(digits = round_digits)
+    temp@assays@data[[save_assay]] <- 10^(log10(temp@assays@data[[from_assay]]) - unlist(adj.mean[[x]]))%>%round(digits = round_digits)
     temp@assays@data$mfi_normed <- 10^(log10(temp@assays@data$mfi_default) - unlist(adj.mean.mfi[[x]]))%>%round(digits = round_digits)
     #temp@elementMetadata$LOD_normed <- 10^(temp@elementMetadata$LOD - unlist(bridge.adj[[x]]))
     #temp@elementMetadata$HOD_normed <- 10^(temp@elementMetadata$HOD - unlist(bridge.adj[[x]]))
