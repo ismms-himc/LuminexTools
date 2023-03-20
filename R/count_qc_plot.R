@@ -1,3 +1,4 @@
+#'count_qc_plot
 #'@description  Heatmap plot count location to visualize the
 #'             location with beads count < 35. red color indicate
 #'             low beads count

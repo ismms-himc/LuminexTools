@@ -6,16 +6,16 @@
 #'@param bridge.str vector of common strings to identify sets of bridging samples
 #'@param data.ls list of summarizedexperiment objs using read_npx().
 #'               normalized assay slot will be added to each of the object in the list.
-#'@param between.plate.method method to set the inter plate reference value of bridging samples
-#'       using max can garantee no negative value of the normalized data
 #'@param round_digits digit kept
 #'@param from_assay select assay slot to be normalized
 #'@param save_assay name the assay slot for normalized data
 #'@export
 #'@md
 #'
-bdg_norm_lmx_multi <- function(bridge.str, data.ls, between.plate.method = "median", round_digits = 3,
-                         from_assay = "default", save_assay = "normed"){
+bdg_norm_lmx_multi <- function(bridge.str, data.ls, round_digits = 3, between.plate.method = "mean",
+                         from.assay = "default", save_assay = "normed"){
+
+  from_assay <- paste("data", from.assay, sep = "_")
 
   if(is.null(names(data.ls))){
     stop("list of data has to be named list!\n")
@@ -37,6 +37,7 @@ bdg_norm_lmx_multi <- function(bridge.str, data.ls, between.plate.method = "medi
     bridge <- pull_bdg(data.ls, pattern = x, fields = "Sample")%>%
       cmb_lmx_se()
     #  count
+
     bridge.plate.mean <- cbind.data.frame(File = bridge$File,
                                           t(bridge@assays@data[[from_assay]] %>% log10))%>%
       group_by(File)%>%
@@ -117,11 +118,17 @@ bdg_norm_lmx_multi <- function(bridge.str, data.ls, between.plate.method = "medi
   data.ls <- lapply(query, function(x){
     temp <- data.ls[[x]]
     temp@assays@data[[save_assay]] <- 10^(log10(temp@assays@data[[from_assay]]) - unlist(adj.mean[[x]]))%>%round(digits = round_digits)
+    for (i in 1 : ncol(temp)) {
+      temp@assays@data[[save_assay]][ , i] <- ifelse(is.finite(temp@assays@data[[from_assay]][ , i]),
+                                                    yes = temp@assays@data[[save_assay]][ , i],
+                                                    no = temp@assays@data[[from_assay]][ , i])
+    }
     temp@assays@data$mfi_normed <- 10^(log10(temp@assays@data$mfi_default) - unlist(adj.mean.mfi[[x]]))%>%round(digits = round_digits)
-    #temp@elementMetadata$LOD_normed <- 10^(temp@elementMetadata$LOD - unlist(bridge.adj[[x]]))
-    #temp@elementMetadata$HOD_normed <- 10^(temp@elementMetadata$HOD - unlist(bridge.adj[[x]]))
+    temp@elementMetadata$LOD_normed <- 10^(log10(temp@elementMetadata$LOD) - unlist(adj.mean[[x]]))
+    temp@elementMetadata$HOD_normed <- 10^(log10(temp@elementMetadata$HOD) - unlist(adj.mean[[x]]))
     temp
   })
 
   data.ls
 }
+

@@ -1,3 +1,4 @@
+#'norm_replace_fun
 #'@description  normalized MFI component by selected reference sample,
 #'              position-wise average the STD from each plates,
 #'              only the 1st plate will keep STD as the averaged value,

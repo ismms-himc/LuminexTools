@@ -1,9 +1,9 @@
-
+#'read_lmx
 #'@description  read lmx raw file to create a summarizedexperiment
 #'              >HOD is replaced by Inf, <LOD is replaced by -Inf;
 #'              retrieve STD3, and the lowest, the hightest STD's MFI, Conc.
 #'              (correlated to LLOD and HLOD and matching MFI)
-#'
+#'@import dplyr
 #'@export
 #'@param f a string file path
 #'@param lot: optional parameter to record lot information
@@ -17,7 +17,7 @@
 read_lmx <- function(f, lot = "default", analyt_start_row){
 
   if(grepl("xls$", f)){
-    fdata <- read_xls(f, sheet = 1, col_names = T)
+    fdata <- readxl::read_xls(f, sheet = 1, col_names = T)
   }
   if(grepl("xlsx$", f)){
     fdata <- read.xlsx(f, sheetName = "Summary", header = F)
@@ -30,13 +30,13 @@ read_lmx <- function(f, lot = "default", analyt_start_row){
     mutate(unique_id = paste(Location, Sample, sep = "_"),
            File = f,
            Lot = lot)%>%
-    set_rownames(value = .$unique_id)
+    magrittr::set_rownames(value = .$unique_id)
 
   analyt <- fdata[3, -c(1:2)]
   analyt <- analyt[!is.na(analyt)]
   rowdata <- data.frame(Analyt = make.names(analyt),
                         Unit = as.character(fdata[4, -c(1:2)][1: length(analyt)]))%>%
-    set_rownames(value = .$Analyt)
+    magrittr::set_rownames(value = .$Analyt)
 
   fdata <- data.frame(fdata[-c(1:4), -c(1:2)])
   fdata <- data.frame(fdata[, 1:length(analyt)])
@@ -80,7 +80,7 @@ read_lmx <- function(f, lot = "default", analyt_start_row){
   rdata <- lapply(rowdata$Analyt, function(x){
     #temp <- read.xlsx(f, sheetIndex = which(sheet.list == x), header = T, startRow = analyt_start_row)
     if(grepl("xls$", f)){
-      temp <- read_xls(f, sheet = (2 + which(sheet.list == x)), col_names = T, skip = (analyt_start_row - 1))
+      temp <- readxl::read_xls(f, sheet = (2 + which(sheet.list == x)), col_names = T, skip = (analyt_start_row - 1))
       temp <- temp[1: (grep("Note", temp$Location)-2), ]
     }
     if(grepl("xlsx$", f)){
@@ -91,8 +91,8 @@ read_lmx <- function(f, lot = "default", analyt_start_row){
 
     temp <- temp%>%
       dplyr::select(Location, Sample, MFI, CV)%>%
-      filter(!is.na(Sample))%>%
-      set_colnames(value = c("Location", "Sample",
+      dplyr::filter(!is.na(Sample))%>%
+      magrittr::set_colnames(value = c("Location", "Sample",
                              paste0(x, "_MFI"),
                              paste0(x, "_CV")))
     temp
@@ -101,7 +101,7 @@ read_lmx <- function(f, lot = "default", analyt_start_row){
   rstd <- lapply(rowdata$Analyt, function(x){
     #temp <- read.xlsx(f, sheetIndex = which(sheet.list == x), header = T, startRow = analyt_start_row)
     if(grepl("xls$", f)){
-      temp_std <- read_xls(f, sheet = (2 + which(sheet.list == x)), col_names = T, skip = 6)
+      temp_std <- readxl::read_xls(f, sheet = (2 + which(sheet.list == x)), col_names = T, skip = 6)
       temp_std <- temp_std[1: (grep("Note", unlist(temp_std[ , 1]))[1]-2), ]
     }
     if(grepl("xlsx$", f)){
@@ -119,7 +119,7 @@ read_lmx <- function(f, lot = "default", analyt_start_row){
       as.numeric()# std3 conc.
   })%>%
     do.call(what = rbind)%>%
-    set_colnames(value = c("low_MFI", "low_conc.", "high_MFI", "high_conc.", "std3_MFI", "std3_conc.", "std3_cv",
+    magrittr::set_colnames(value = c("low_MFI", "low_conc.", "high_MFI", "high_conc.", "std3_MFI", "std3_conc.", "std3_cv",
                            "std4_MFI", "std4_conc.", "std4_cv"))
 
   rowdata <- rowdata%>%

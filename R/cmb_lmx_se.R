@@ -1,3 +1,4 @@
+#'cmb_lmx_se
 #'@description combind a list of luminex summarizedexperiment
 #'@param se_list list of npx summarizedexperiment obj
 #'rowData will be cbind, common colData

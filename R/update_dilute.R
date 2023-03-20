@@ -1,5 +1,4 @@
 #' update samples with different dilution factors
-#'@rdname update_dilute
 #'@description update samples with different dilution factors
 #'@param se npx summarizedexpermient object
 #'@param sample_pattern string pattern to sample

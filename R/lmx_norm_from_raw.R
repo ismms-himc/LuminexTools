@@ -1,3 +1,4 @@
+#'lmx_norm_from_raw
 #'@description  read lmx raw file to list of dataframes of each components
 #'
 #'

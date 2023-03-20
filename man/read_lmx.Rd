@@ -2,7 +2,7 @@
 % Please edit documentation in R/read_lmx.R
 \name{read_lmx}
 \alias{read_lmx}
-\title{read_lmx (read onlink npx file to summarizedexperiment)}
+\title{read_lmx}
 \usage{
 read_lmx(f, lot = "default", analyt_start_row)
 }
