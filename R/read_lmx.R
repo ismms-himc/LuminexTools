@@ -112,15 +112,29 @@ read_lmx <- function(f, lot = "default", analyt_start_row){
     idx_l <- which(!is.na(temp_std$MFI))[2]
     idx_h <- which(!is.na(temp_std$MFI))
     idx_h <- idx_h[length(idx_h)]
-    c(temp_std[idx_l, "MFI"], temp_std[idx_l, 11], # lowest std gradient's mfi and conc.
-      temp_std[idx_h, "MFI"], temp_std[idx_h, 11], # highest std gradient's mfi and conc.
-      temp_std[temp_std$Location == "1E1", "MFI"], temp_std[temp_std$Location == "1E1", 11], temp_std[temp_std$Location == "1E1", 13],
-      temp_std[temp_std$Location == "1G1", "MFI"], temp_std[temp_std$Location == "1G1", 11], temp_std[temp_std$Location == "1G1", 13])%>%
-      as.numeric()# std3 conc.
+    #c(temp_std[idx_l, "MFI"], temp_std[idx_l, 11], # lowest std gradient's mfi and conc.
+    #  temp_std[idx_h, "MFI"], temp_std[idx_h, 11], # highest std gradient's mfi and conc.
+    #  temp_std[temp_std$Location == "1A1", "MFI"], temp_std[temp_std$Location == "1A1", 11], temp_std[temp_std$Location == "1A1", 13],
+    #  temp_std[temp_std$Location == "1C1", "MFI"], temp_std[temp_std$Location == "1C1", 11], temp_std[temp_std$Location == "1C1", 13],
+    #  temp_std[temp_std$Location == "1E1", "MFI"], temp_std[temp_std$Location == "1E1", 11], temp_std[temp_std$Location == "1E1", 13],
+    #  temp_std[temp_std$Location == "1G1", "MFI"], temp_std[temp_std$Location == "1G1", 11], temp_std[temp_std$Location == "1G1", 13],
+    #  temp_std[temp_std$Location == "1I1", "MFI"], temp_std[temp_std$Location == "1I1", 11], temp_std[temp_std$Location == "1I1", 13],
+    #  temp_std[temp_std$Location == "1K1", "MFI"], temp_std[temp_std$Location == "1K1", 11], temp_std[temp_std$Location == "1K1", 13],
+    #  temp_std[temp_std$Location == "1M1", "MFI"], temp_std[temp_std$Location == "1M1", 11], temp_std[temp_std$Location == "1M1", 13],
+    #  temp_std[temp_std$Location == "1O1", "MFI"], temp_std[temp_std$Location == "1O1", 11], temp_std[temp_std$Location == "1O1", 13]
+    #  )%>%
+    #  as.numeric()
+    std_read <- as.numeric(c(temp_std[idx_l, "MFI"], temp_std[idx_l, 11], # lowest std gradient's mfi and conc.
+                             temp_std[idx_h, "MFI"], temp_std[idx_h, 11])) # highest std gradient's mfi and conc.
+    for (y in 0 : (nrow(temp_std)/2 - 1)) {
+      std_read <- as.numeric(c(std_read, temp_std[y*2+1, "MFI"], temp_std[y*2+1, 11]))
+    }
+    std_read
   })%>%
-    do.call(what = rbind)%>%
-    magrittr::set_colnames(value = c("low_MFI", "low_conc.", "high_MFI", "high_conc.", "std3_MFI", "std3_conc.", "std3_cv",
-                           "std4_MFI", "std4_conc.", "std4_cv"))
+    do.call(what = rbind)
+
+  colnames(rstd) <- c("low_MFI", "low_conc.", "high_MFI", "high_conc.",
+                      make.names(rep(c("MFI", "conc"), (ncol(rstd)-4)/2), unique = T))
 
   rowdata <- rowdata%>%
     cbind(data.frame(rstd))
