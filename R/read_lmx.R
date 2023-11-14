@@ -17,10 +17,10 @@
 read_lmx <- function(f, lot = "default", analyt_start_row){
 
   if(grepl("xls$", f)){
-    fdata <- readxl::read_xls(f, sheet = 1, col_names = T)
+    fdata <- readxl::read_xls(f, sheet = 1, col_names = T, .name_repair = "unique_quiet" )
   }
   if(grepl("xlsx$", f)){
-    fdata <- read.xlsx(f, sheetName = "Summary", header = F)
+    fdata <- read.xlsx(f, sheetName = "Summary", header = F, .name_repair = "unique_quiet" )
   }
 
   fdata <- fdata[1 : (which(fdata[ , 1] == "Notes:")-1), ]
@@ -80,11 +80,13 @@ read_lmx <- function(f, lot = "default", analyt_start_row){
   rdata <- lapply(rowdata$Analyt, function(x){
     #temp <- read.xlsx(f, sheetIndex = which(sheet.list == x), header = T, startRow = analyt_start_row)
     if(grepl("xls$", f)){
-      temp <- readxl::read_xls(f, sheet = (2 + which(sheet.list == x)), col_names = T, skip = (analyt_start_row - 1))
+      temp <- readxl::read_xls(f, sheet = (2 + which(sheet.list == x)), col_names = T, skip = (analyt_start_row - 1),
+                               .name_repair = "unique_quiet" )
       temp <- temp[1: (grep("Note", temp$Location)-2), ]
     }
     if(grepl("xlsx$", f)){
-      temp <- read.xlsx(f, sheetIndex = (2 + which(sheet.list == x)), header = T, startRow = analyt_start_row)
+      temp <- read.xlsx(f, sheetIndex = (2 + which(sheet.list == x)), header = T, startRow = analyt_start_row,
+                        .name_repair = "unique_quiet" )
       temp <- temp[1: (grep("Note", temp$Location)-1), ]
     }
 
@@ -101,11 +103,11 @@ read_lmx <- function(f, lot = "default", analyt_start_row){
   rstd <- lapply(rowdata$Analyt, function(x){
     #temp <- read.xlsx(f, sheetIndex = which(sheet.list == x), header = T, startRow = analyt_start_row)
     if(grepl("xls$", f)){
-      temp_std <- readxl::read_xls(f, sheet = (2 + which(sheet.list == x)), col_names = T, skip = 6)
+      temp_std <- readxl::read_xls(f, sheet = (2 + which(sheet.list == x)), col_names = T, skip = 6, .name_repair = "unique_quiet" )
       temp_std <- temp_std[1: (grep("Note", unlist(temp_std[ , 1]))[1]-2), ]
     }
     if(grepl("xlsx$", f)){
-      temp_std <- read.xlsx(f, sheetIndex = (2 + which(sheet.list == x)), header = T, startRow = 7)
+      temp_std <- read.xlsx(f, sheetIndex = (2 + which(sheet.list == x)), header = T, startRow = 7, )
       temp_std <- temp_std[1: (grep("Note", unlist(temp_std[ , 1]))[1]-1), ]
     }
 
