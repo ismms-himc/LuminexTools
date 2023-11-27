@@ -12,10 +12,10 @@
 #'@export
 #'@md
 #'
-bdg_norm_lmx_multi <- function(bridge.str, data.ls, round_digits = 3, between.plate.method = "mean",
-                         from.assay = "default", save_assay = "normed"){
+bdg_norm_lmx_multi <- function(bridge.str, data.ls, round_digits = 3, between.plate.method = "mean", ref_batch = NULL,
+                         from_assay = "default", save_assay = "normed"){
 
-  from_assay <- paste("data", from.assay, sep = "_")
+  #from_assay <- paste("data", from.assay, sep = "_")
 
   if(is.null(names(data.ls))){
     stop("list of data has to be named list!\n")
@@ -31,6 +31,20 @@ bdg_norm_lmx_multi <- function(bridge.str, data.ls, round_digits = 3, between.pl
     stop("not all bridging samples exist in each plate!")
   }
 
+  if(!is_null(ref_batch) & ( !isTRUE(ref_batch %in% names(data.ls)) | (length(ref_batch) > 1))){
+    stop("set a single ref_batch from names(data.ls)!")
+  }
+
+  #check avaliable ref
+  actual_n_ref <- sapply(rownames(data.ls[[1]]), function(x){
+    analyte_eval <- lapply(data.ls, function(y){
+      y@assays@data[[from_assay]][x, match(bridge.str, y$Sample)]
+    })%>%
+      do.call(what = "rbind")%>%
+      colSums()
+    sum(is.finite(analyte_eval))
+  })
+
   names(bridge.str) <- bridge.str
 
   adj.ls <- lapply(bridge.str, function(x){
@@ -43,10 +57,13 @@ bdg_norm_lmx_multi <- function(bridge.str, data.ls, round_digits = 3, between.pl
       group_by(File)%>%
       summarize_all(.fun = mean, na.rm = T)
 
-
-    bridge.median <- bridge.plate.mean%>%
-      dplyr::select(-File)%>%
-      summarize_all(.funs = between.plate.method, na.rm = T)
+    if(is_null(ref_batch)){
+      bridge.median <- bridge.plate.mean%>%
+        dplyr::select(-File)%>%
+        summarize_all(.funs = between.plate.method, na.rm = T)
+    }else{
+      bridge.median <- bridge.plate.mean[bridge.plate.mean$File == ref_batch, -1]
+    }
 
 
     # update adjust factor
@@ -68,7 +85,7 @@ bdg_norm_lmx_multi <- function(bridge.str, data.ls, round_digits = 3, between.pl
         #adj.mean[[i]] <- adj.mean[[i]] + adj.ls[[j]][[i]]
         adj.mean[[i]] <- mapply(function(x, y) sum(x, y, na.rm = T), x = adj.mean[[i]], y = adj.ls[[j]][[i]])
       }
-      adj.mean[[i]] <- adj.mean[[i]]/length(adj.ls)
+      adj.mean[[i]] <- adj.mean[[i]]/actual_n_ref
     }
   }
 
@@ -82,10 +99,13 @@ bdg_norm_lmx_multi <- function(bridge.str, data.ls, round_digits = 3, between.pl
       group_by(File)%>%
       summarize_all(.fun = mean, na.rm = T)
 
-
-    bridge.median.mfi <- bridge.plate.mean.mfi%>%
-      dplyr::select(-File)%>%
-      summarize_all(.funs = between.plate.method, na.rm = T)
+    if(is_null(ref_batch)){
+      bridge.median.mfi <- bridge.plate.mean.mfi%>%
+        dplyr::select(-File)%>%
+        summarize_all(.funs = between.plate.method, na.rm = T)
+    }else{
+      bridge.median.mfi <- bridge.plate.mean.mfi[bridge.plate.mean.mfi$File == ref_batch, -1]
+    }
 
 
     # update adjust factor
