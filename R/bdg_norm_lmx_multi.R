@@ -15,7 +15,7 @@
 bdg_norm_lmx_multi <- function(bridge.str, data.ls, round_digits = 3, between.plate.method = "mean", ref_batch = NULL,
                          from_assay = "default", save_assay = "normed"){
 
-  #from_assay <- paste("data", from.assay, sep = "_")
+  from_assay <- paste("data", from_assay, sep = "_")
 
   if(is.null(names(data.ls))){
     stop("list of data has to be named list!\n")
@@ -38,7 +38,7 @@ bdg_norm_lmx_multi <- function(bridge.str, data.ls, round_digits = 3, between.pl
   #check avaliable ref
   actual_n_ref <- sapply(rownames(data.ls[[1]]), function(x){
     analyte_eval <- lapply(data.ls, function(y){
-      y@assays@data[[from_assay]][x, match(bridge.str, y$Sample)]
+      y@assays@data[[from_assay]][x, grepl(paste0("(", paste(bridge.str, collapse = "|"), ")"), ignore.case = T, y$Sample)]
     })%>%
       do.call(what = "rbind")%>%
       colSums()
