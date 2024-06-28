@@ -1,0 +1,196 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-06-28"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readxl)
+library(tidyverse)
+library(magrittr)
+library(tidyr)
+library(SummarizedExperiment)
+library(patchwork)
+library(LuminexTools)
+```
+
+### a. read file name
+folder/
+  data/
+    file1
+    file2
+  Luminex_QA_temp.Rmd
+```{r}
+f.list <- list.files("data", full.names = T)
+names(f.list) <- f.list
+
+f.list <- lapply(f.list, LuminexTools::read_lmx, analyt_start_row = 28)
+```
+
+### b.normalized by bdg_norm_lmx_multi(bridge.str, data.ls, ref_bach)   
+assign common reference samples and inspect for 
+```{r}
+commonsample <- c("QC", "HD")
+names(f.list)
+```
+
+### c. Normalization     
+Normalization do not take account of plate-wise global median normalization, for the reason that luminex is quantitive assay.      
+    + use case 1: ref_batch = NULL, global plate median of commonsample normalization will be applied.    
+    + use case 2: ref_batch = some_names(f.list), one of the file name need to be used as the anchor plate. inspect file name using names(f.list).      
+    + use case 3: bridge.str = commonsample, commonsample will be used to compute normalization factor.    
+
+```{r}
+
+f.list <- bdg_norm_lmx_multi(bridge.str = commonsample, data.ls = f.list)
+cmb <- LuminexTools::cmb_lmx_se(f.list)
+```
+
+### d. save file output
+data_default: data as is.   
+data_imputed: below detection is replaced by LOD.    
+normed: normalized.(option).    
+
+```{r}
+# save file 
+LuminexTools::save_lmx_csv(cmb, pre_fix = ".", assay2save = c("data_default", "data_imputed", "normed"))
+```
+
+# QA. 
+prepare data for plot.   
+```{r}
+lod <- data.frame(analyt = rownames(cmb),
+                  lod = cmb@elementMetadata$LOD)
+
+hod <- data.frame(analyt = rownames(cmb),
+                  hod = cmb@elementMetadata$HOD)
+
+##--combined plates
+plotdf <- data.frame(Sample = cmb$Sample,
+                     plate = gsub("(.*Plate|_Results.*)", "", cmb$File),
+                     t(cmb@assays@data$data_imputed))%>%
+  mutate(type = case_when(
+    grepl("HD", Sample)  ~ "HD",
+    grepl("QC", Sample) ~ "QC",
+    TRUE ~ "StudySample"
+  ))%>%
+  mutate(sample = gsub("(^THMA02_|_R|_extra| extra)", "", Sample),
+         timepoint = gsub(".*_", "", sample),
+         sample = gsub("_.*", "", sample))
+
+
+# for plot
+plotdf <- plotdf %>%
+  gather(-Sample, -sample, -type, -plate, -timepoint, key = "analyte", value = "value")
+
+```
+
+### e. plot for QC, HD, Studysamply by type
+```{r}
+plot.ls <- lapply(unique(plotdf$analyte), function(x){
+
+  tit = x
+  plotdf%>%
+  #filter(Sample != "HDPlasma_1017")%>%
+  dplyr::filter(analyte == x)%>%
+  ggplot(aes(type, log1p(as.numeric(value))))+
+  geom_boxplot(aes(color = plate))+
+  geom_point(aes(color = plate),
+             position = position_jitterdodge(dodge.width = 0.75, jitter.width = 0.2))+
+  ggrepel::geom_text_repel(aes(label = Sample), size = 2.5)+
+  #geom_hline(yintercept = lod$lod[lod$analyt == x]%>%log1p(), color = "blue", alpha = 0.5)+
+  #geom_hline(yintercept = hod$hod[lod$analyt == x]%>%log1p(), color = "red", alpha = 0.5)+
+  geom_segment(aes(x = 0.5, xend = 3.5, y = log1p(lod), yend = log1p(lod)),
+               color = "blue",
+               data = lod %>% dplyr::filter(analyt == x))+
+  geom_segment(aes(x = 0.5, xend = 3.5, y = log1p(hod), yend = log1p(hod)),
+             color = "red",
+             data = hod %>% dplyr::filter(analyt == x))+
+  labs(title = tit, y = "log1p Conc.", x = "")+
+  #labs(y = "log1p Conc.", x = "")+
+  theme_bw(base_size = 12)+
+  #facet_grid(analyte ~ plate)+
+  theme(axis.text.x = element_text(angle = 90, hjust = 0.5, vjust = 0.5, size = 8))
+})
+
+# per 4x6 panel plot
+for(i in 0 : (nrow(cmb)/24-1)) {
+  p <- wrap_plots(plot.ls[(i*24+1) : min(nrow(cmb), (i*24+24))], ncol = 6)
+  p_name <- paste0("trace_plot_", i, ".png" )
+  ggsave(filename =p_name, plot = p, width = 15, height = 7, dpi = 750) # change size res as needed
+}
+```
+
+### f. plate out of range sample count summary
+```{r}
+sub_tit = paste("total sample on plates:", ncol(cmb))
+
+data.frame(Sample = cmb$Sample,
+                     t(cmb@assays@data$data_default))%>%
+  gather(-Sample, key = "analyte", value = "value")%>%
+  group_by(analyte)%>%
+  summarise(out_of_range_count = sum(!is.finite(value)))%>%
+  ggplot(aes(analyte, out_of_range_count))+
+  geom_bar(stat = "identity", alpha = 0.7)+
+  geom_text(aes(label = out_of_range_count))+
+  coord_flip()+
+  labs(subtitle = sub_tit)+
+  theme_bw()
+```
+
+### g. timepoint plot   
+```{r}
+plot.ls <- lapply(unique(plotdf$analyte), function(x){
+
+  tit = x
+  plotdf%>%
+  dplyr::filter(type != "HD", type != "QC")%>%
+  dplyr::filter(analyte == x)%>%
+  ggplot(aes(timepoint, log1p(as.numeric(value))))+
+  geom_point()+
+  geom_line(aes(group = sample))+
+  labs(title = tit, y = "log1p Conc.", x = "")+
+  #labs(y = "log1p Conc.", x = "")+
+  theme_bw(base_size = 12)+
+  #facet_grid(analyte ~ plate)+
+  theme(axis.text.x = element_text(angle = 90, hjust = 0.5, vjust = 0.5, size = 8))
+})
+
+# per 4x6 panel plot
+for(i in 0 : (nrow(cmb)/24-1)) {
+  p <- wrap_plots(plot.ls[(i*24+1) : min(nrow(cmb), (i*24+24))], ncol = 6)
+  p_name <- paste0("trace_plot_", i, ".png" )
+  ggsave(filename =p_name, plot = p, width = 15, height = 7, dpi = 750) # change size res as needed
+}
+
+```
+
+### h. PCA
+```{r}
+mat <- t(scale(t(cmb@assays@data$data_imputed[ ,!grepl("(QC|HD1017)", cmb$Sample)])))
+
+colnames(mat)
+hmat <- mat%>% 
+  data.frame()%>%
+  mutate_all(log10)%>%
+  mutate_all(scale)%>%
+  as.matrix()
+hmat[is.na(hmat)] <- 0
+summary(as.numeric(hmat))
+#mat[mat > 2] <- 2
+pheatmap::pheatmap(t(hmat))
+
+fit <- prcomp(t(mat))
+data.frame(sample = colnames(mat),
+           fit$x)%>%
+  ggplot(aes(PC1, PC2))+
+  geom_point()+
+  theme_bw()
+
+write.csv(data.frame(
+  sample = mat$Sample,
+  hmat
+), file = "~/Downloads/clusterg.csv")
+```
+
